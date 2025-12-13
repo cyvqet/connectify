@@ -10,17 +10,22 @@ import (
 	"connectify/internal/repository/cache"
 )
 
-type CodeService struct {
+type CodeService interface {
+	Send(ctx context.Context, bizType, phone string) (string, error)
+	Verify(ctx context.Context, bizType, phone, inputCode string) (bool, error)
+}
+
+type codeService struct {
 	repo repository.CodeRepository
 }
 
-func NewCodeService(repo repository.CodeRepository) *CodeService {
-	return &CodeService{
+func NewCodeService(repo repository.CodeRepository) CodeService {
+	return &codeService{
 		repo: repo,
 	}
 }
 
-func (svc *CodeService) Send(ctx context.Context, bizType, phone string) (string, error) {
+func (svc *codeService) Send(ctx context.Context, bizType, phone string) (string, error) {
 	verificationCode, err := svc.generate()
 	if err != nil {
 		return "", fmt.Errorf("generate verification code failed: %w", err)
@@ -36,7 +41,7 @@ func (svc *CodeService) Send(ctx context.Context, bizType, phone string) (string
 	return verificationCode, nil
 }
 
-func (svc *CodeService) Verify(ctx context.Context, bizType, phone, inputCode string) (bool, error) {
+func (svc *codeService) Verify(ctx context.Context, bizType, phone, inputCode string) (bool, error) {
 	ok, err := svc.repo.Verify(ctx, bizType, phone, inputCode)
 
 	// If the verification frequency limit is triggered, only tell the upper layer "verification failed"
@@ -47,7 +52,7 @@ func (svc *CodeService) Verify(ctx context.Context, bizType, phone, inputCode st
 }
 
 // generate generate 6-digit random verification code (using crypto/rand to ensure unpredictability)
-func (svc *CodeService) generate() (string, error) {
+func (svc *codeService) generate() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	if err != nil {
 		return "", err

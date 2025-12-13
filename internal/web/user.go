@@ -29,11 +29,11 @@ const (
 )
 
 type UserHandler struct {
-	svc     *service.UserService
-	codeSvc *service.CodeService
+	svc     service.UserService
+	codeSvc service.CodeService
 }
 
-func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	return &UserHandler{
 		svc:     svc,
 		codeSvc: codeSvc,
