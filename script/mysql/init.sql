@@ -1,1 +1,2 @@
-create database connectify; // Create database named connectify
+-- Auto-create database on MySQL container startup
+CREATE DATABASE IF NOT EXISTS connectify;

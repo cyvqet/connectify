@@ -96,7 +96,6 @@ func (r *userRepository) FindByPhone(ctx context.Context, phone string) (domain.
 	return r.entityToDomain(u), nil
 }
 
-// 内部辅助方法，改为小写私有
 func (r *userRepository) entityToDomain(u dao.User) domain.User {
 	return domain.User{
 		Id:       u.Id,

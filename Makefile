@@ -16,6 +16,7 @@ STEP    = echo "$(CYAN)==>$(RESET)"
 
 # Define phony targets (not real files, always execute commands)
 .PHONY: docker docker-clean docker-deploy mysql-deploy mysql-clean redis-deploy redis-clean ingress-deploy ingress-clean redeploy all
+.PHONY: dev dev-up dev-down dev-run dev-clean help k8s k8s-clean
 
 # Docker image build - compile Go program and build Docker image
 docker:
@@ -151,7 +152,47 @@ redeploy:
 
 	@$(SUCCESS) "Rolling update completed successfully"
 
-# One-click build, clean, and deploy - full CI/CD workflow
+# Clean all Kubernetes resources
+k8s-clean:
+	@$(WARN) "Cleaning ALL Kubernetes resources..."
+	@kubectl delete service connectify-record 2>/dev/null || true
+	@kubectl delete deployment connectify-record-service 2>/dev/null || true
+	@kubectl delete service connectify-record-mysql 2>/dev/null || true
+	@kubectl delete deployment connectify-record-mysql 2>/dev/null || true
+	@kubectl delete pvc connectify-mysql-pvc 2>/dev/null || true
+	@kubectl delete pv connectify-mysql-pv 2>/dev/null || true
+	@kubectl delete service connectify-record-redis 2>/dev/null || true
+	@kubectl delete deployment connectify-record-redis 2>/dev/null || true
+	@kubectl delete ingress connectify-record-ingress 2>/dev/null || true
+	@sleep 2
+	@$(SUCCESS) "All Kubernetes resources cleaned"
+
+# One-click Kubernetes deployment (stops local dev first)
+k8s: 
+	@echo ""
+	@echo "$(YELLOW)==========================================$(RESET)"
+	@echo "$(YELLOW)  Switching to Kubernetes Environment$(RESET)"
+	@echo "$(YELLOW)==========================================$(RESET)"
+	@echo ""
+	@$(WARN) "Stopping local development environment first..."
+	@cd deploy/docker && docker-compose down 2>/dev/null || true
+	@$(WARN) "Killing any process on port 8080..."
+	@lsof -ti :8080 | xargs kill -9 2>/dev/null || true
+	@$(MAKE) docker docker-clean mysql-deploy redis-deploy docker-deploy ingress-deploy
+	@echo ""
+	@echo "$(GREEN)==========================================$(RESET)"
+	@echo "$(GREEN)  K8s Deployment completed!$(RESET)"
+	@echo "$(GREEN)==========================================$(RESET)"
+	@echo ""
+	@$(INFO) "Access URL: http://localhost/test"
+	@echo ""
+	@$(INFO) "Common commands:"
+	@echo "  kubectl get pods"
+	@echo "  kubectl logs -f deployment/connectify-record-service"
+	@echo "  make k8s-clean  (clean all K8s resources)"
+	@echo ""
+
+# Legacy: One-click build, clean, and deploy - full CI/CD workflow
 all: docker docker-clean mysql-deploy redis-deploy docker-deploy ingress-deploy
 	@echo ""
 	@echo "$(GREEN)==========================================$(RESET)"
@@ -168,3 +209,170 @@ all: docker docker-clean mysql-deploy redis-deploy docker-deploy ingress-deploy
 	@echo "  kubectl exec -it \$$(kubectl get pods -l app=connectify-record -o jsonpath='{.items[0].metadata.name}') -- sh"
 	@echo "  make docker-clean mysql-clean redis-clean ingress-clean"
 	@echo ""
+
+# ==========================================
+# Local Development Commands
+# ==========================================
+
+# Start local dependencies (MySQL + Redis) - stops K8s first
+dev-up:
+	@echo ""
+	@echo "$(YELLOW)==========================================$(RESET)"
+	@echo "$(YELLOW)  Switching to Local Dev Environment$(RESET)"
+	@echo "$(YELLOW)==========================================$(RESET)"
+	@echo ""
+	@$(WARN) "Stopping Kubernetes services first (if running)..."
+	@kubectl delete service connectify-record 2>/dev/null || true
+	@kubectl delete deployment connectify-record-service 2>/dev/null || true
+	@kubectl delete ingress connectify-record-ingress 2>/dev/null || true
+	@$(WARN) "Killing any process on port 8080..."
+	@lsof -ti :8080 | xargs kill -9 2>/dev/null || true
+	@$(INFO) "Starting local development dependencies..."
+	@cd deploy/docker && docker-compose up -d
+	@$(INFO) "Waiting for MySQL to be ready..."
+	@sleep 5
+	@$(SUCCESS) "Local dependencies started"
+	@echo ""
+	@$(INFO) "MySQL: localhost:13316 (user: root, password: root)"
+	@$(INFO) "Redis: localhost:6379"
+
+# Stop local dependencies
+dev-down:
+	@$(INFO) "Stopping local development dependencies..."
+	@cd deploy/docker && docker-compose down
+	@$(SUCCESS) "Local dependencies stopped"
+
+# Clean local dependencies (including volumes)
+dev-clean:
+	@$(INFO) "Cleaning local development environment..."
+	@cd deploy/docker && docker-compose down -v
+	@$(SUCCESS) "Local environment cleaned (volumes removed)"
+
+# Run the application locally
+dev-run:
+	@$(INFO) "Running application locally..."
+	@go run .
+
+# One-click local development - start deps and run app
+dev: dev-up
+	@echo ""
+	@echo "$(GREEN)==========================================$(RESET)"
+	@echo "$(GREEN)  Local Development Environment Ready$(RESET)"
+	@echo "$(GREEN)==========================================$(RESET)"
+	@echo ""
+	@$(INFO) "Starting application on :8080..."
+	@go run .
+
+.PHONY: logs k8s-logs k8s-status k8s-shell mysql-shell redis-cli status
+
+# Show help
+help:
+	@echo ""
+	@echo "$(BOLD)Connectify Backend - Available Commands$(RESET)"
+	@echo ""
+	@echo "$(CYAN)Quick Switch:$(RESET)"
+	@echo "  make dev          - Switch to local development"
+	@echo "  make k8s          - Switch to Kubernetes"
+	@echo ""
+	@echo "$(CYAN)Local Development:$(RESET)"
+	@echo "  make dev          - One-click: stop K8s + start deps + run app"
+	@echo "  make dev-up       - Start MySQL & Redis containers only"
+	@echo "  make dev-down     - Stop containers"
+	@echo "  make dev-run      - Run app only (deps already running)"
+	@echo "  make dev-clean    - Stop containers & remove volumes"
+	@echo ""
+	@echo "$(CYAN)Kubernetes:$(RESET)"
+	@echo "  make k8s          - One-click: stop local + full K8s deploy"
+	@echo "  make k8s-status   - Show pods, services, ingress status"
+	@echo "  make k8s-logs     - Tail application logs"
+	@echo "  make k8s-shell    - Shell into app container"
+	@echo "  make k8s-clean    - Clean all K8s resources"
+	@echo "  make redeploy     - Rebuild & rolling update"
+	@echo ""
+	@echo "$(CYAN)Database & Cache:$(RESET)"
+	@echo "  make mysql-shell  - Connect to MySQL CLI"
+	@echo "  make redis-cli    - Connect to Redis CLI"
+	@echo ""
+	@echo "$(CYAN)Debugging:$(RESET)"
+	@echo "  make status       - Show current environment status"
+	@echo "  make logs         - Tail logs (auto-detect environment)"
+	@echo ""
+
+# ==========================================
+# Status & Logs Commands
+# ==========================================
+
+# Show current environment status
+status:
+	@echo ""
+	@echo "$(BOLD)Current Environment Status$(RESET)"
+	@echo ""
+	@echo "$(CYAN)Port 8080:$(RESET)"
+	@lsof -i :8080 2>/dev/null || echo "  (not in use)"
+	@echo ""
+	@echo "$(CYAN)Docker Compose:$(RESET)"
+	@cd deploy/docker && docker-compose ps 2>/dev/null || echo "  (not running)"
+	@echo ""
+	@echo "$(CYAN)Kubernetes:$(RESET)"
+	@kubectl get pods -l app=connectify-record 2>/dev/null || echo "  (no pods)"
+	@echo ""
+
+# Tail logs (auto-detect environment)
+logs:
+	@if kubectl get pods -l app=connectify-record 2>/dev/null | grep -q Running; then \
+		$(INFO) "Tailing K8s logs..."; \
+		kubectl logs -f -l app=connectify-record --all-containers; \
+	else \
+		$(INFO) "K8s not running. Use 'make dev' to start local development."; \
+	fi
+
+# K8s: Show status of all resources
+k8s-status:
+	@echo ""
+	@echo "$(BOLD)Kubernetes Resources$(RESET)"
+	@echo ""
+	@echo "$(CYAN)Pods:$(RESET)"
+	@kubectl get pods -l app=connectify-record 2>/dev/null || true
+	@kubectl get pods -l app=connectify-record-mysql 2>/dev/null || true
+	@kubectl get pods -l app=connectify-record-redis 2>/dev/null || true
+	@echo ""
+	@echo "$(CYAN)Services:$(RESET)"
+	@kubectl get svc | grep connectify 2>/dev/null || true
+	@echo ""
+	@echo "$(CYAN)Ingress:$(RESET)"
+	@kubectl get ingress 2>/dev/null || true
+	@echo ""
+
+# K8s: Tail application logs
+k8s-logs:
+	@$(INFO) "Tailing K8s application logs (Ctrl+C to stop)..."
+	@kubectl logs -f -l app=connectify-record --all-containers
+
+# K8s: Shell into app container
+k8s-shell:
+	@$(INFO) "Connecting to app container..."
+	@kubectl exec -it $$(kubectl get pods -l app=connectify-record -o jsonpath='{.items[0].metadata.name}') -- sh
+
+# Connect to MySQL CLI
+mysql-shell:
+	@if cd deploy/docker && docker-compose ps 2>/dev/null | grep -q mysql8; then \
+		$(INFO) "Connecting to local MySQL..."; \
+		docker exec -it docker-mysql8-1 mysql -uroot -proot connectify; \
+	elif kubectl get pods -l app=connectify-record-mysql 2>/dev/null | grep -q Running; then \
+		$(INFO) "Connecting to K8s MySQL..."; \
+		kubectl exec -it $$(kubectl get pods -l app=connectify-record-mysql -o jsonpath='{.items[0].metadata.name}') -- mysql -uroot -proot connectify; \
+	else \
+		$(ERROR) "No MySQL found. Run 'make dev' or 'make k8s' first."; \
+	fi
+
+# Connect to Redis CLI
+redis-cli:
+	@if cd deploy/docker && docker-compose ps 2>/dev/null | grep -q redis; then \
+		$(INFO) "Connecting to local Redis..."; \
+		docker exec -it docker-redis-1 redis-cli; \
+	elif kubectl get pods -l app=connectify-record-redis 2>/dev/null | grep -q Running; then \
+		$(INFO) "Connecting to K8s Redis..."; \
+		kubectl exec -it $$(kubectl get pods -l app=connectify-record-redis -o jsonpath='{.items[0].metadata.name}') -- redis-cli; \
+	else \
+		$(ERROR) "No Redis found. Run 'make dev' or 'make k8s' first."; \
+	fi
