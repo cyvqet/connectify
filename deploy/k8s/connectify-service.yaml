@@ -1,0 +1,13 @@
+# service-docker-desktop.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: connectify-record
+spec:
+  selector:
+    app: connectify-record
+  ports:
+    - protocol: TCP
+      port: 8080        # Browser access port
+      targetPort: 8080  # Pod port
+  type: LoadBalancer    # Docker Desktop will automatically map to localhost

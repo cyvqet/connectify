@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connectify-record-mysql
+  labels:
+    app: connectify-record-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: connectify-record-mysql
+  template:
+    metadata:
+      name: connectify-record-mysql
+      labels:
+        app: connectify-record-mysql
+    spec:
+      containers:
+        - name: connectify-record-mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306 # 容器暴露的端口
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: mysql-storage
+      restartPolicy: Always
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: connectify-mysql-pvc

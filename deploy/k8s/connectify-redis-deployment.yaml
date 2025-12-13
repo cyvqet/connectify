@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connectify-record-redis
+  labels:
+    app: connectify-record-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: connectify-record-redis
+  template:
+    metadata:
+      name: connectify-record-redis
+      labels:
+        app: connectify-record-redis
+    spec:
+      containers:
+        - name: connectify-record-redis
+          image: redis:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+      restartPolicy: Always
+      
