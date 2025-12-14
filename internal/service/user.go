@@ -1,5 +1,7 @@
 package service
 
+//go:generate mockgen -source=user.go -destination=mocks/user_mock.go -package=svcmocks
+
 import (
 	"context"
 	"errors"

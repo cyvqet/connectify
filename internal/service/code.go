@@ -1,5 +1,7 @@
 package service
 
+//go:generate mockgen -source=code.go -destination=mocks/code_mock.go -package=svcmocks
+
 import (
 	"context"
 	"crypto/rand"
