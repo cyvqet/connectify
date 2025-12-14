@@ -10,6 +10,7 @@ import (
 
 	"connectify/internal/repository"
 	"connectify/internal/repository/cache"
+	"connectify/internal/service/sms"
 )
 
 type CodeService interface {
@@ -19,13 +20,17 @@ type CodeService interface {
 
 type codeService struct {
 	repo repository.CodeRepository
+	sms  sms.Service
 }
 
-func NewCodeService(repo repository.CodeRepository) CodeService {
+func NewCodeService(repo repository.CodeRepository, smsService sms.Service) CodeService {
 	return &codeService{
 		repo: repo,
+		sms:  smsService,
 	}
 }
+
+const smsTemplateID = "SMS_VERIFICATION_CODE"
 
 func (svc *codeService) Send(ctx context.Context, bizType, phone string) (string, error) {
 	verificationCode, err := svc.generate()
@@ -36,9 +41,9 @@ func (svc *codeService) Send(ctx context.Context, bizType, phone string) (string
 		return "", fmt.Errorf("set verification code failed: %w", err)
 	}
 
-	// TODO: Call SMS service to send verification code here
-	// const smsTemplateID = "your_sms_template_id"
-	// return svc.sms.Send(ctx, smsTemplateID, []string{verificationCode}, phone)
+	if err := svc.sms.Send(ctx, smsTemplateID, []string{verificationCode}, phone); err != nil {
+		return "", fmt.Errorf("send sms failed: %w", err)
+	}
 
 	return verificationCode, nil
 }
