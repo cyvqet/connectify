@@ -5,24 +5,24 @@ import (
 	"connectify/pkg/ratelimit"
 	"context"
 	"errors"
-	"fmt"
 )
 
 type Service struct {
 	smsSvc  sms.Service
 	limiter ratelimit.Limiter
+	key     string
 }
 
 func NewService(smsSvc sms.Service, limiter ratelimit.Limiter) sms.Service {
 	return &Service{
 		smsSvc:  smsSvc,
 		limiter: limiter,
+		key:     "sms-rate-limit",
 	}
 }
 
 func (s *Service) Send(ctx context.Context, tplId string, args []string, numbers ...string) error {
-	key := fmt.Sprintf("sms:send:%s", numbers[0])
-	ok, err := s.limiter.Limit(ctx, key)
+	ok, err := s.limiter.Limit(ctx, s.key)
 	if err != nil {
 		return err
 	}

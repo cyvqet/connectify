@@ -13,6 +13,7 @@ import (
 	"connectify/internal/service"
 	"connectify/internal/web"
 	"connectify/ioc"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,7 +29,7 @@ func InitWebServer() *gin.Engine {
 	userService := service.NewUserService(userRepository)
 	codeCache := cache.NewCodeCache(cmdable)
 	codeRepository := repository.NewCodeRepository(codeCache)
-	smsService := ioc.InitSMSService(cmdable)
+	smsService := ioc.InitSmsService(cmdable)
 	codeService := service.NewCodeService(codeRepository, smsService)
 	userHandler := web.NewUserHandler(userService, codeService)
 	engine := ioc.InitWebServer(v, userHandler)
