@@ -5,12 +5,23 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 func main() {
+	initLog()
 	initConfig() // initialize config
 	server := InitWebServer()
 	server.Run(":8080")
+}
+
+func initLog() {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	zap.ReplaceGlobals(logger)
 }
 
 func initConfig() {

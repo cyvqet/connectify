@@ -8,6 +8,7 @@ import (
 
 	"github.com/cyvqet/connectify/internal/domain"
 	"github.com/cyvqet/connectify/internal/repository"
+	"github.com/cyvqet/connectify/pkg/logger"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -27,11 +28,13 @@ type UserService interface {
 
 type userService struct {
 	repo repository.UserRepository
+	l    logger.Logger
 }
 
-func NewUserService(repo repository.UserRepository) UserService {
+func NewUserService(repo repository.UserRepository, l logger.Logger) UserService {
 	return &userService{
 		repo: repo,
+		l:    l,
 	}
 }
 
